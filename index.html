@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#111827" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>ZapLeva - Curvelo e Região</title>
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23111827'/><circle cx='50' cy='45' r='22' fill='%2325D366'/><text x='50' y='88' font-size='18' font-family='Arial' font-weight='bold' text-anchor='middle' fill='white'>ZapLeva</text></svg>" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --primary: #111827;
+      --accent: #16a34a;
+      --whatsapp: #25D366;
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --danger: #ef4444;
+      --nav-h: 64px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+    body, html { height: 100%; width: 100%; overflow: hidden; background: var(--bg); color: var(--text); }
+    #app { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; }
+    .main-area { position: relative; flex: 1; width: 100%; overflow: hidden; }
+
+    .view-section {
+      position: absolute; inset: 0; display: none; flex-direction: column;
+      background: var(--bg); overflow-y: auto; padding: 16px; padding-bottom: 28px; z-index: 20;
+    }
+    .view-section.active { display: flex; }
+    #view-passenger { padding: 0; overflow: hidden; background: transparent; }
+    #map { width: 100%; height: 100%; z-index: 1; }
+
+    .top-bar {
+      position: absolute; top: 12px; left: 12px; right: 12px; z-index: 1000;
+      display: flex; justify-content: space-between; align-items: center; pointer-events: none;
+    }
+    .top-bar > * { pointer-events: auto; }
+
+    .brand-pill {
+      background: var(--card); padding: 8px 14px; border-radius: 999px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12); display: flex; align-items: center; gap: 8px;
+      font-weight: 800; font-size: 15px;
+    }
+    .brand-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--whatsapp); box-shadow: 0 0 0 3px rgba(37,211,102,0.25); }
+
+    .pill-btn {
+      border: none; border-radius: 999px; padding: 8px 12px; font-size: 12px; font-weight: 700;
+      cursor: pointer; background: var(--card); color: var(--text);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12); display: flex; align-items: center; gap: 5px;
+    }
+    .pill-btn.zap { background: var(--whatsapp); color: #fff; }
+
+    .map-hint {
+      position: absolute; top: 62px; left: 50%; transform: translateX(-50%);
+      z-index: 1000; background: rgba(17,24,39,0.92); color: #fff;
+      padding: 8px 16px; border-radius: 999px; font-size: 12px; font-weight: 600; display: none; white-space: nowrap;
+    }
+
+    .bottom-sheet {
+      position: absolute; bottom: 0; left: 0; right: 0; z-index: 1000; background: var(--card);
+      border-top-left-radius: 22px; border-top-right-radius: 22px;
+      box-shadow: 0 -6px 28px rgba(0,0,0,0.14); padding: 12px 16px 16px;
+      max-height: 70vh; overflow-y: auto;
+    }
+    @media (min-width: 768px) {
+      .bottom-sheet { left: 16px; bottom: 16px; right: auto; width: 420px; border-radius: 22px; }
+    }
+    .sheet-handle { width: 38px; height: 4px; background: #cbd5e1; border-radius: 999px; margin: 0 auto 10px; }
+
+    .route-inputs { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+    .input-row {
+      display: flex; align-items: center; background: #f1f5f9;
+      border-radius: 12px; padding: 3px 8px; border: 1.5px solid transparent;
+    }
+    .input-row:focus-within { border-color: var(--primary); background: #fff; }
+    .dot-origin { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); margin: 0 8px; flex-shrink: 0; }
+    .dot-dest { width: 10px; height: 10px; border-radius: 2px; background: var(--primary); margin: 0 8px; flex-shrink: 0; }
+    .input-row input { flex: 1; border: none; background: transparent; padding: 9px 4px; font-size: 14px; outline: none; min-width: 0; }
+
+    .mini-btn {
+      border: none; background: #e2e8f0; color: var(--text); border-radius: 8px;
+      padding: 6px 8px; font-size: 11px; font-weight: 700; cursor: pointer; margin-left: 4px;
+    }
+
+    .suggestions-box {
+      background: #fff; border: 1px solid var(--border); border-radius: 12px;
+      max-height: 155px; overflow-y: auto; margin-bottom: 10px; display: none;
+    }
+    .suggestion-item { padding: 9px 12px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; }
+    .suggestion-item:last-child { border-bottom: none; }
+    .suggestion-sub { font-size: 11px; color: var(--muted); display: block; }
+
+    .quick-places { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 6px; scrollbar-width: none; }
+    .quick-places::-webkit-scrollbar { display: none; }
+    .chip {
+      background: #f1f5f9; border: 1px solid var(--border); padding: 6px 10px;
+      border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer;
+    }
+
+    .ride-options { display: none; flex-direction: column; gap: 9px; margin-top: 8px; border-top: 1px solid var(--border); padding-top: 10px; }
+    .trip-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); font-weight: 700; align-items: center; }
+    .surge-badge { background: #fef3c7; color: #b45309; padding: 2px 8px; border-radius: 999px; font-size: 11px; display: none; }
+
+    .vehicle-card {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 12px; border: 2px solid var(--border); border-radius: 12px; cursor: pointer;
+    }
+    .vehicle-card.active { border-color: var(--primary); background: #f8fafc; }
+    .vehicle-info h4 { font-size: 14px; font-weight: 700; }
+    .vehicle-info p { font-size: 11px; color: var(--muted); }
+    .vehicle-price { font-size: 17px; font-weight: 800; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    input.field, select.field {
+      width: 100%; padding: 10px 12px; border: 1.5px solid var(--border);
+      border-radius: 10px; font-size: 14px; outline: none; background: #fff;
+    }
+    input.field:focus, select.field:focus { border-color: var(--primary); }
+
+    .btn {
+      width: 100%; border: none; padding: 13px; border-radius: 12px; font-size: 14px; font-weight: 700;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
+      background: var(--primary); color: #fff;
+    }
+    .btn.green { background: var(--accent); }
+    .btn.zap { background: var(--whatsapp); }
+    .btn.red { background: var(--danger); }
+    .btn.gray { background: #e2e8f0; color: var(--text); }
+    .btn.sm { padding: 9px 12px; font-size: 13px; }
+
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .page-header h2 { font-size: 20px; font-weight: 800; }
+
+    .card {
+      background: var(--card); border-radius: 16px; padding: 15px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 12px; border: 1px solid var(--border);
+    }
+
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    .badge.pending { background: #fef3c7; color: #b45309; }
+    .badge.accepted { background: #dbeafe; color: #1d4ed8; }
+    .badge.in_progress { background: #dcfce7; color: #15803d; }
+    .badge.completed { background: #e2e8f0; color: #334155; }
+    .badge.cancelled { background: #fee2e2; color: #b91c1c; }
+
+    .form-group { margin-bottom: 10px; }
+    .form-group label { display: block; font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; }
+
+    .kpi-box { background: #f8fafc; padding: 10px; border-radius: 12px; text-align: center; border: 1px solid var(--border); }
+    .kpi-box span { display: block; font-size: 11px; color: var(--muted); font-weight: 600; }
+    .kpi-box strong { font-size: 16px; font-weight: 800; color: var(--primary); }
+
+    .switch-row { display: flex; justify-content: space-between; align-items: center; }
+    .toggle-btn { padding: 8px 16px; border-radius: 999px; border: none; font-weight: 800; font-size: 13px; cursor: pointer; }
+    .toggle-btn.off { background: #e2e8f0; color: var(--muted); }
+    .toggle-btn.on { background: var(--accent); color: #fff; }
+
+    .pix-box {
+      background: #ecfdf5; border: 1px dashed #10b981; border-radius: 10px;
+      padding: 10px; margin-bottom: 10px; font-size: 12px; display: none;
+      justify-content: space-between; align-items: center; gap: 8px;
+    }
+
+    .bottom-nav {
+      height: var(--nav-h); background: var(--card); border-top: 1px solid var(--border);
+      display: grid; grid-template-columns: repeat(4, 1fr); z-index: 1500;
+    }
+    .nav-item {
+      border: none; background: transparent; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 3px; font-size: 11px; font-weight: 600; color: var(--muted); cursor: pointer;
+    }
+    .nav-item .nav-icon { font-size: 19px; }
+    .nav-item.active { color: var(--primary); font-weight: 800; }
+
+    .mode-banner {
+      font-size: 11px; padding: 7px 10px; border-radius: 8px; margin-bottom: 10px;
+      background: #eff6ff; color: #1e40af; font-weight: 600; border: 1px solid #bfdbfe;
+    }
+
+    .toast {
+      position: fixed; top: 68px; left: 50%; transform: translateX(-50%);
+      background: #111827; color: #fff; padding: 10px 18px; border-radius: 999px;
+      font-size: 13px; font-weight: 600; z-index: 3000; display: none; box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+    }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <div class="main-area">
+
+    <!-- ================= TELA 1: PASSAGEIRO ================= -->
+    <section id="view-passenger" class="view-section active">
+      <div class="top-bar">
+        <div class="brand-pill">
+          <span class="brand-dot"></span>
+          <span id="appTitleDisplay">ZapLeva</span>
+        </div>
+        <button class="pill-btn zap" onclick="openDriverGroup()">💬 Grupo Zap</button>
+      </div>
+
+      <div id="mapHint" class="map-hint">Toque no mapa para marcar o local...</div>
+      <div id="map"></div>
+
+      <div class="bottom-sheet">
+        <div class="sheet-handle"></div>
+
+        <div id="passengerRequestBox">
+          <div class="route-inputs">
+            <div class="input-row">
+              <div class="dot-origin"></div>
+              <input id="originInput" type="text" placeholder="Onde você está? (Ex: Centro, Bela Vista)" autocomplete="off" />
+              <button class="mini-btn" onclick="useCurrentLocation()">📍 GPS</button>
+              <button class="mini-btn" onclick="startMapPick('origin')">🗺️</button>
+            </div>
+            <div class="input-row">
+              <div class="dot-dest"></div>
+              <input id="destInput" type="text" placeholder="Para onde você vai?" autocomplete="off" />
+              <button class="mini-btn" onclick="swapPoints()">⇅</button>
+              <button class="mini-btn" onclick="startMapPick('dest')">🗺️</button>
+            </div>
+          </div>
+
+          <div id="suggestionsBox" class="suggestions-box"></div>
+
+          <div class="quick-places">
+            <span class="chip" onclick="selectPreset('Centro (Praça Central), Curvelo', -18.7550, -44.4288)">📍 Centro</span>
+            <span class="chip" onclick="selectPreset('Basílica São Geraldo, Curvelo', -18.7517, -44.4342)">⛪ Basílica</span>
+            <span class="chip" onclick="selectPreset('Rodoviária de Curvelo', -18.7575, -44.4367)">🚌 Rodoviária</span>
+            <span class="chip" onclick="selectPreset('Hospital Imaculada Conceição, Curvelo', -18.7542, -44.4310)">🏥 Hospital</span>
+            <span class="chip" onclick="selectPreset('Bairro Bela Vista, Curvelo', -18.7465, -44.4395)">🏘️ Bela Vista</span>
+            <span class="chip" onclick="selectPreset('Bairro Ponte Nova, Curvelo', -18.7652, -44.4225)">🏘️ Ponte Nova</span>
+            <span class="chip" onclick="selectPreset('Inimutaba - MG', -18.7385, -44.3612)">🛣️ Inimutaba</span>
+            <span class="chip" onclick="selectPreset('Felixlândia - MG', -18.7568, -44.8994)">🛣️ Felixlândia</span>
+            <span class="chip" onclick="selectPreset('Corinto - MG', -18.3615, -44.4567)">🛣️ Corinto</span>
+          </div>
+
+          <div id="rideOptions" class="ride-options">
+            <div class="trip-meta">
+              <span id="distDisplay">Distância: -- km</span>
+              <span id="surgeBadge" class="surge-badge">+0%</span>
+              <span id="timeDisplay">Tempo: -- min</span>
+            </div>
+
+            <div class="vehicle-card active" id="cardCar" onclick="selectVehicle('car')">
+              <div class="vehicle-info">
+                <h4>🚗 ZapLeva Carro</h4>
+                <p id="carRateHint">Até 4 passageiros</p>
+              </div>
+              <div class="vehicle-price" id="carPriceDisplay">R$ 0,00</div>
+            </div>
+
+            <div class="vehicle-card" id="cardMoto" onclick="selectVehicle('moto')">
+              <div class="vehicle-info">
+                <h4>🏍️ ZapLeva Moto</h4>
+                <p id="motoRateHint">Mais rápido e econômico</p>
+              </div>
+              <div class="vehicle-price" id="motoPriceDisplay">R$ 0,00</div>
+            </div>
+
+            <div class="grid-2">
+              <input class="field" type="text" id="passengerName" placeholder="Seu nome *" />
+              <input class="field" type="tel" id="passengerPhone" placeholder="Seu WhatsApp" />
+            </div>
+            <div class="grid-2">
+              <select class="field" id="passengerPayment">
+                <option value="Pix">💠 Pagar no Pix</option>
+                <option value="Dinheiro">💵 Dinheiro</option>
+                <option value="Cartão">💳 Cartão</option>
+              </select>
+              <input class="field" type="text" id="passengerNote" placeholder="Obs / Ponto ref." />
+            </div>
+
+            <button class="btn green" onclick="requestRide()">🚀 Chamar Motorista Agora</button>
+          </div>
+        </div>
+
+        <div id="activeRideCard" style="display:none;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <strong style="font-size:16px;">Sua Corrida</strong>
+            <span id="activeRideBadge" class="badge pending">Procurando motorista</span>
+          </div>
+          <p id="activeRideRoute" style="font-size:13px; color:var(--muted); margin-bottom:8px; line-height:1.45;"></p>
+          <div id="activeRideDriverInfo" style="background:#f8fafc; padding:10px; border-radius:10px; margin-bottom:10px; font-size:13px; border:1px solid var(--border);"></div>
+          <div id="activeRidePixBox" class="pix-box">
+            <div><strong>Chave Pix:</strong><br><span id="pixKeyText"></span></div>
+            <button class="btn green sm" style="width:auto;" onclick="copyPixKey()">📋 Copiar Pix</button>
+          </div>
+          <div class="grid-2">
+            <button class="btn zap sm" onclick="sendActiveRideToZap()">📲 Enviar no Zap</button>
+            <button id="btnPassengerCancel" class="btn red sm" onclick="cancelActiveRide()">✕ Cancelar</button>
+            <button id="btnPassengerNew" class="btn green sm" style="display:none;" onclick="clearMyRide()">+ Nova Corrida</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TELA 2: MOTORISTA ================= -->
+    <section id="view-driver" class="view-section">
+      <div class="page-header">
+        <h2>🚘 Painel do Motorista</h2>
+        <button class="pill-btn zap" onclick="openDriverGroup()">💬 Grupo Zap</button>
+      </div>
+
+      <div id="driverPinBox" class="card" style="display:none;">
+        <h3 style="font-size:16px; margin-bottom:6px;">🔐 Acesso para Motoristas</h3>
+        <p style="font-size:12px; color:var(--muted); margin-bottom:10px;">
+          Digite o PIN informado no grupo oficial de motoristas do ZapLeva.
+        </p>
+        <div class="grid-2">
+          <input class="field" type="password" id="driverPinInput" placeholder="PIN do motorista" />
+          <button class="btn green sm" onclick="unlockDriverPanel()">Liberar Acesso</button>
+        </div>
+      </div>
+
+      <div id="driverMainBox">
+        <div class="card">
+          <div class="switch-row" style="margin-bottom:12px;">
+            <div>
+              <strong style="font-size:15px;">Status do Motorista</strong>
+              <p id="driverStatusText" style="font-size:12px; color:var(--muted);">Você está offline</p>
+            </div>
+            <button id="driverOnlineBtn" class="toggle-btn off" onclick="toggleDriverOnline()">OFFLINE</button>
+          </div>
+
+          <div class="grid-2" style="margin-bottom:8px;">
+            <div class="form-group">
+              <label>Seu Nome</label>
+              <input class="field" id="driverName" placeholder="Ex: João Silva" onchange="saveDriverProfile()" />
+            </div>
+            <div class="form-group">
+              <label>Categoria</label>
+              <select class="field" id="driverVehicleType" onchange="saveDriverProfile()">
+                <option value="car">🚗 Carro</option>
+                <option value="moto">🏍️ Moto</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="form-group" style="margin-bottom:0;">
+              <label>Veículo / Cor</label>
+              <input class="field" id="driverCarModel" placeholder="Ex: Onix Branco" onchange="saveDriverProfile()" />
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label>Placa</label>
+              <input class="field" id="driverPlate" placeholder="Ex: ABC-1D23" onchange="saveDriverProfile()" />
+            </div>
+          </div>
+        </div>
+
+        <div id="driverActiveCard" class="card" style="display:none; border-color: var(--accent); border-width: 2px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <strong>🏁 Corrida Atual</strong>
+            <span id="driverActiveBadge" class="badge accepted">Aceita</span>
+          </div>
+          <div id="driverActiveDetails" style="font-size:13px; line-height:1.5; margin-bottom:10px;"></div>
+          <button id="btnDriverZapPassenger" class="btn zap sm" style="margin-bottom:8px; display:none;" onclick="contactPassengerZap()">💬 Falar com Passageiro no Zap</button>
+          <div class="grid-2" style="margin-bottom:8px;">
+            <button class="btn gray sm" onclick="openDriverMaps('origin')">🗺️ Ir p/ Embarque</button>
+            <button class="btn gray sm" onclick="openDriverMaps('dest')">🗺️ Ir p/ Destino</button>
+          </div>
+          <div class="grid-2">
+            <button id="btnStartTrip" class="btn sm" onclick="driverUpdateStatus('in_progress')">▶️ Iniciar Viagem</button>
+            <button id="btnFinishTrip" class="btn green sm" onclick="driverUpdateStatus('completed')">✅ Finalizar</button>
+          </div>
+        </div>
+
+        <h3 style="font-size:15px; font-weight:800; margin:6px 0 10px;">🔔 Corridas Disponíveis</h3>
+        <div id="driverPendingList"></div>
+      </div>
+    </section>
+
+    <!-- ================= TELA 3: HISTÓRICO ================= -->
+    <section id="view-history" class="view-section">
+      <div class="page-header"><h2>📜 Histórico de Corridas</h2></div>
+      <div id="historyList"></div>
+    </section>
+
+    <!-- ================= TELA 4: ADMIN ================= -->
+    <section id="view-admin" class="view-section">
+      <div class="page-header"><h2>⚙️ Painel Admin</h2></div>
+      <div id="dbModeBanner" class="mode-banner"></div>
+
+      <div id="adminLoginBox" class="card">
+        <h3 style="font-size:16px; margin-bottom:6px;">🔐 Acesso Restrito ao Dono</h3>
+        <p id="adminLoginHint" style="font-size:12px; color:var(--muted); margin-bottom:12px;"></p>
+        <div class="form-group"><label>E-mail Admin</label><input class="field" type="email" id="adminEmail" placeholder="seuemail@gmail.com" /></div>
+        <div class="form-group"><label>Senha</label><input class="field" type="password" id="adminPassword" placeholder="Sua senha" /></div>
+        <button class="btn" onclick="adminLogin()">🔓 Entrar no Painel</button>
+      </div>
+
+      <div id="adminPanelBox" style="display:none;">
+        <div class="grid-2" style="margin-bottom:12px;">
+          <div class="kpi-box"><span>Total Corridas</span><strong id="kpiTotal">0</strong></div>
+          <div class="kpi-box"><span>Concluídas</span><strong id="kpiDone">0</strong></div>
+          <div class="kpi-box"><span>Volume Bruto</span><strong id="kpiRevenue">R$ 0</strong></div>
+          <div class="kpi-box"><span>Comissão App</span><strong id="kpiFee">R$ 0</strong></div>
+        </div>
+
+        <div class="card">
+          <div class="form-group"><label>Nome do App</label><input class="field" id="cfgAppName" /></div>
+          <div class="form-group"><label>Link do Grupo de Motoristas (WhatsApp)</label><input class="field" type="url" id="cfgGroupLink" placeholder="https://chat.whatsapp.com/..." /></div>
+          <div class="grid-2">
+            <div class="form-group"><label>WhatsApp Central</label><input class="field" type="tel" id="cfgCentralPhone" placeholder="5538999999999" /></div>
+            <div class="form-group"><label>PIN Motoristas</label><input class="field" type="text" id="cfgDriverPin" placeholder="Ex: 2026" /></div>
+          </div>
+          <div class="grid-2">
+            <div class="form-group" style="margin-bottom:0;"><label>Chave Pix</label><input class="field" type="text" id="cfgPixKey" placeholder="CPF / Celular / Chave" /></div>
+            <div class="form-group" style="margin-bottom:0;"><label>Comissão App (%)</label><input class="field" type="number" step="1" id="cfgPlatformFee" /></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <strong style="display:block; margin-bottom:10px;">🚗 Tarifas - Carro</strong>
+          <div class="grid-2">
+            <div class="form-group"><label>Bandeirada (R$)</label><input class="field" type="number" step="0.10" id="cfgCarBase" /></div>
+            <div class="form-group"><label>Por Km (R$)</label><input class="field" type="number" step="0.10" id="cfgCarKm" /></div>
+            <div class="form-group"><label>Por Min (R$)</label><input class="field" type="number" step="0.05" id="cfgCarMin" /></div>
+            <div class="form-group"><label>Mínima (R$)</label><input class="field" type="number" step="0.50" id="cfgCarMinFare" /></div>
+          </div>
+
+          <strong style="display:block; margin:10px 0;">🏍️ Tarifas - Moto</strong>
+          <div class="grid-2">
+            <div class="form-group"><label>Bandeirada (R$)</label><input class="field" type="number" step="0.10" id="cfgMotoBase" /></div>
+            <div class="form-group"><label>Por Km (R$)</label><input class="field" type="number" step="0.10" id="cfgMotoKm" /></div>
+            <div class="form-group"><label>Por Min (R$)</label><input class="field" type="number" step="0.05" id="cfgMotoMin" /></div>
+            <div class="form-group"><label>Mínima (R$)</label><input class="field" type="number" step="0.50" id="cfgMotoMinFare" /></div>
+          </div>
+
+          <div class="form-group" style="margin-top:8px;"><label>⚡ Acréscimo Dinâmica / Chuva (%)</label><input class="field" type="number" step="1" id="cfgSurgePct" /></div>
+          <button class="btn green" onclick="saveAdminConfig()" style="margin-bottom:8px;">💾 Salvar e Atualizar p/ Todos</button>
+          <button class="btn gray" onclick="adminLogout()">🚪 Sair do Admin</button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <nav class="bottom-nav">
+    <button class="nav-item active" id="nav-passenger" onclick="switchTab('passenger')"><span class="nav-icon">🚕</span><span>Pedir</span></button>
+    <button class="nav-item" id="nav-driver" onclick="switchTab('driver')"><span class="nav-icon">🚘</span><span>Motorista</span></button>
+    <button class="nav-item" id="nav-history" onclick="switchTab('history')"><span class="nav-icon">📜</span><span>Histórico</span></button>
+    <button class="nav-item" id="nav-admin" onclick="switchTab('admin')"><span class="nav-icon">⚙️</span><span>Admin</span></button>
+  </nav>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-firestore-compat.js"></script>
+
+<script>
+const FIREBASE_CONFIG = {
+  apiKey: "SUA_API_KEY",
+  authDomain: "SEU_PROJETO.firebaseapp.com",
+  projectId: "SEU_PROJETO",
+  storageBucket: "SEU_PROJETO.appspot.com",
+  messagingSenderId: "000000000000",
+  appId: "1:000000000000:web:000000000000"
+};
+
+const DEMO_ADMIN_PASS = "admin123";
+
+const DEFAULT_CONFIG = {
+  appName: "ZapLeva",
+  groupLink: "",
+  centralPhone: "",
+  driverPin: "",
+  pixKey: "",
+  platformFeePct: 15,
+  carBase: 5.00, carKm: 2.50, carMin: 0.25, carMinFare: 10.00,
+  motoBase: 3.50, motoKm: 1.60, motoMin: 0.15, motoMinFare: 7.00,
+  surgePct: 0
+};
+
+const CURVELO_PLACES = [
+  { name: "Centro (Praça Central), Curvelo", lat: -18.7550, lng: -44.4288 },
+  { name: "Basílica São Geraldo, Curvelo", lat: -18.7517, lng: -44.4342 },
+  { name: "Rodoviária de Curvelo", lat: -18.7575, lng: -44.4367 },
+  { name: "Hospital Imaculada Conceição, Curvelo", lat: -18.7542, lng: -44.4310 },
+  { name: "Bairro Bela Vista, Curvelo", lat: -18.7465, lng: -44.4395 },
+  { name: "Bairro Ponte Nova, Curvelo", lat: -18.7652, lng: -44.4225 },
+  { name: "Bairro Tibira, Curvelo", lat: -18.7450, lng: -44.4170 },
+  { name: "Bairro Vila de Lourdes, Curvelo", lat: -18.7580, lng: -44.4190 },
+  { name: "Bairro Santa Rita, Curvelo", lat: -18.7620, lng: -44.4390 },
+  { name: "Bairro Ipiranga, Curvelo", lat: -18.7485, lng: -44.4260 },
+  { name: "Inimutaba - MG", lat: -18.7385, lng: -44.3612 },
+  { name: "Felixlândia - MG", lat: -18.7568, lng: -44.8994 },
+  { name: "Corinto - MG", lat: -18.3615, lng: -44.4567 },
+  { name: "Cordisburgo - MG", lat: -19.1255, lng: -44.3208 },
+  { name: "Morro da Garça - MG", lat: -18.5453, lng: -44.5997 }
+];
+
+const K_CFG = "zapleva_v3_cfg", K_RIDES = "zapleva_v3_rides", K_MY_RIDE = "zapleva_v3_my_ride";
+const K_DRIVER = "zapleva_v3_driver", K_DRIVER_PIN_OK = "zapleva_v3_driver_pin_ok";
+
+const isFirebaseConfigured = FIREBASE_CONFIG.apiKey !== "SUA_API_KEY" && typeof firebase !== "undefined";
+let db = null, auth = null;
+let demoChannel = ("BroadcastChannel" in window) ? new BroadcastChannel("zapleva_v3_sync") : null;
+
+let config = { ...DEFAULT_CONFIG }, ridesList = [];
+let myRideId = localStorage.getItem(K_MY_RIDE) || null;
+let adminLoggedIn = false, driverProfile = loadDriverProfile(), lastKnownPendingIds = new Set();
+
+const CURVELO_CENTER = [-18.7550, -44.4288];
+let map, originMarker, destMarker, routeLine;
+let originPoint = null, destPoint = null, pickMode = null, activeInputTarget = "dest";
+let selectedVehicle = "car", currentTrip = null;
+
+document.addEventListener("DOMContentLoaded", () => {
+  initMap();
+  initBackend();
+  loadDriverInputs();
+  updateBannerInfo();
+});
+
+function updateBannerInfo() {
+  const banner = document.getElementById("dbModeBanner");
+  const hint = document.getElementById("adminLoginHint");
+  if (isFirebaseConfigured) {
+    banner.textContent = "🟢 Conectado ao Banco de Dados na Nuvem (Firebase).";
+    banner.style.background = "#dcfce7"; banner.style.color = "#166534"; banner.style.borderColor = "#86efac";
+  } else {
+    banner.textContent = `🟡 Modo Demo Local (sem Firebase). Senha Admin Demo: ${DEMO_ADMIN_PASS}`;
+    hint.textContent = `Modo Demo ativo: use qualquer e-mail e a senha "${DEMO_ADMIN_PASS}".`;
+  }
+}
+
+function initBackend() {
+  if (isFirebaseConfigured) {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.firestore();
+    auth = firebase.auth();
+    db.collection("config").doc("tarifas").onSnapshot((doc) => {
+      config = doc.exists ? { ...DEFAULT_CONFIG, ...doc.data() } : { ...DEFAULT_CONFIG };
+      onConfigUpdated();
+    });
+    db.collection("rides").orderBy("createdAt", "desc").limit(60).onSnapshot((snap) => {
+      ridesList = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      onRidesUpdated();
+    });
+    auth.onAuthStateChanged((user) => { adminLoggedIn = !!user; renderAdminAuthUI(); });
+  } else {
+    loadDemoData();
+    if (demoChannel) demoChannel.onmessage = () => loadDemoData();
+    window.addEventListener("storage", () => loadDemoData());
+  }
+}
+
+function loadDemoData() {
+  try { config = { ...DEFAULT_CONFIG, ...JSON.parse(localStorage.getItem(K_CFG) || "{}") }; } catch { config = { ...DEFAULT_CONFIG }; }
+  try { ridesList = JSON.parse(localStorage.getItem(K_RIDES) || "[]"); } catch { ridesList = []; }
+  onConfigUpdated();
+  onRidesUpdated();
+}
+
+function broadcastDemo() { if (demoChannel) demoChannel.postMessage("sync"); }
+
+function onConfigUpdated() {
+  const name = config.appName || "ZapLeva";
+  document.getElementById("appTitleDisplay").textContent = name;
+  document.title = `${name} - Curvelo e Região`;
+  if (currentTrip) updatePricesUI();
+  if (adminLoggedIn) fillAdminFields();
+  checkDriverPinLock();
+  renderPassengerActiveRide();
+}
+
+function onRidesUpdated() {
+  checkNewRideAlert();
+  renderPassengerActiveRide();
+  renderDriverPanel();
+  renderHistory();
+  renderAdminKPIs();
+}
+
+function switchTab(tab) {
+  document.querySelectorAll(".view-section").forEach((el) => el.classList.remove("active"));
+  document.querySelectorAll(".nav-item").forEach((el) => el.classList.remove("active"));
+  document.getElementById(`view-${tab}`).classList.add("active");
+  document.getElementById(`nav-${tab}`).classList.add("active");
+  if (tab === "passenger" && map) setTimeout(() => map.invalidateSize(), 150);
+}
+
+function showToast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg; el.style.display = "block";
+  clearTimeout(window._toastT);
+  window._toastT = setTimeout(() => { el.style.display = "none"; }, 3000);
+}
+
+function formatBRL(v) { return Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); }
+  catch {
+    const ta = document.createElement("textarea");
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand("copy"); document.body.removeChild(ta);
+  }
+}
+
+const originInput = document.getElementById("originInput");
+const destInput = document.getElementById("destInput");
+const suggestionsBox = document.getElementById("suggestionsBox");
+const mapHint = document.getElementById("mapHint");
+
+function initMap() {
+  map = L.map("map", { zoomControl: false }).setView(CURVELO_CENTER, 14);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { attribution: "&copy; OpenStreetMap", maxZoom: 19 }).addTo(map);
+  L.control.zoom({ position: "bottomright" }).addTo(map);
+
+  map.on("click", async (e) => {
+    if (!pickMode) return;
+    const target = pickMode; pickMode = null; mapHint.style.display = "none";
+    showToast("Buscando endereço...");
+    const name = await reverseGeocode(e.latlng.lat, e.latlng.lng);
+    setPoint(target, name || `Ponto no mapa (${e.latlng.lat.toFixed(4)})`, e.latlng.lat, e.latlng.lng);
+  });
+
+  let searchTimer = null;
+  originInput.addEventListener("focus", () => { activeInputTarget = "origin"; });
+  destInput.addEventListener("focus", () => { activeInputTarget = "dest"; });
+  originInput.addEventListener("input", () => { clearTimeout(searchTimer); const v = originInput.value.trim(); if (v.length < 2) { suggestionsBox.style.display = "none"; return; } searchTimer = setTimeout(() => searchPlaces(v, "origin"), 350); });
+  destInput.addEventListener("input", () => { clearTimeout(searchTimer); const v = destInput.value.trim(); if (v.length < 2) { suggestionsBox.style.display = "none"; return; } searchTimer = setTimeout(() => searchPlaces(v, "dest"), 350); });
+}
+
+function createPinIcon(color, label) {
+  return L.divIcon({
+    className: "custom-pin",
+    html: `<div style="background:${color};color:#fff;font-weight:800;font-size:11px;padding:4px 8px;border-radius:999px;border:2px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,0.3);white-space:nowrap;transform:translate(-50%,-100%);">${label}</div>`,
+    iconSize: [0, 0], iconAnchor: [0, 0]
+  });
+}
+
+async function searchPlaces(query, target) {
+  const qLower = query.toLowerCase();
+  const localMatches = CURVELO_PLACES.filter((p) => p.name.toLowerCase().includes(qLower));
+  suggestionsBox.innerHTML = "";
+
+  localMatches.forEach((p) => {
+    const div = document.createElement("div");
+    div.className = "suggestion-item";
+    div.innerHTML = `<div>📍 ${p.name}</div><span class="suggestion-sub">Curvelo e Região</span>`;
+    div.onclick = () => { suggestionsBox.style.display = "none"; setPoint(target, p.name, p.lat, p.lng); };
+    suggestionsBox.appendChild(div);
+  });
+  if (localMatches.length > 0) suggestionsBox.style.display = "block";
+  if (query.length < 3) return;
+
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=br&viewbox=-45.10,-18.10,-43.90,-19.35&bounded=0&q=${encodeURIComponent(query + ", MG")}`;
+    const res = await fetch(url, { headers: { "Accept-Language": "pt-BR" } });
+    const data = await res.json();
+    if (data && data.length > 0) {
+      data.forEach((item) => {
+        const a = item.address || {};
+        const road = a.road || a.pedestrian || a.suburb || item.display_name.split(",")[0];
+        const city = a.city || a.town || a.village || a.municipality || "Curvelo";
+        const sub = a.suburb || a.neighbourhood || "";
+        const label = [road, sub, city].filter(Boolean).join(" - ");
+        const div = document.createElement("div");
+        div.className = "suggestion-item";
+        div.innerHTML = `<div>${road}</div><span class="suggestion-sub">${[sub, city, a.state].filter(Boolean).join(", ")}</span>`;
+        div.onclick = () => { suggestionsBox.style.display = "none"; setPoint(target, label, parseFloat(item.lat), parseFloat(item.lon)); };
+        suggestionsBox.appendChild(div);
+      });
+      suggestionsBox.style.display = "block";
+    } else if (localMatches.length === 0) {
+      suggestionsBox.innerHTML = `<div class="suggestion-item">Não encontrado. Marque no mapa (🗺️).</div>`;
+      suggestionsBox.style.display = "block";
+    }
+  } catch { if (localMatches.length === 0) showToast("Erro ao buscar endereço."); }
+}
+
+function selectPreset(name, lat, lng) {
+  let target = activeInputTarget;
+  if (!originPoint && target !== "origin") target = "origin";
+  else if (originPoint && !destPoint) target = "dest";
+  suggestionsBox.style.display = "none";
+  setPoint(target, name, lat, lng);
+}
+
+function swapPoints() {
+  if (!originPoint && !destPoint) return;
+  const o = originPoint, d = destPoint;
+  clearMapGraphics();
+  originPoint = d; destPoint = o;
+  originInput.value = originPoint ? originPoint.name : "";
+  destInput.value = destPoint ? destPoint.name : "";
+  if (originPoint) originMarker = L.marker([originPoint.lat, originPoint.lng], { icon: createPinIcon("#16a34a", "Origem") }).addTo(map);
+  if (destPoint) destMarker = L.marker([destPoint.lat, destPoint.lng], { icon: createPinIcon("#111827", "Destino") }).addTo(map);
+  if (originPoint && destPoint) calculateRoute();
+}
+
+function clearMapGraphics() {
+  if (originMarker) { map.removeLayer(originMarker); originMarker = null; }
+  if (destMarker) { map.removeLayer(destMarker); destMarker = null; }
+  if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+}
+
+function useCurrentLocation() {
+  if (!navigator.geolocation) return showToast("GPS não suportado.");
+  showToast("Localizando...");
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      const name = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+      setPoint("origin", name || "Minha localização (GPS)", pos.coords.latitude, pos.coords.longitude);
+    },
+    () => showToast("Sem permissão de GPS. Marque no mapa (🗺️)."),
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+function startMapPick(target) {
+  pickMode = target; suggestionsBox.style.display = "none";
+  mapHint.textContent = target === "origin" ? "Toque no mapa para marcar ORIGEM" : "Toque no mapa para marcar DESTINO";
+  mapHint.style.display = "block";
+}
+
+async function reverseGeocode(lat, lng) {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, { headers: { "Accept-Language": "pt-BR" } });
+    const d = await res.json();
+    if (d && d.address) {
+      const a = d.address;
+      const road = a.road || a.pedestrian || a.suburb || "Rua sem nome";
+      const city = a.city || a.town || a.village || a.municipality || "Curvelo";
+      return `${road}${a.house_number ? ", " + a.house_number : ""} - ${city}`;
+    }
+    return null;
+  } catch { return null; }
+}
+
+function setPoint(target, name, lat, lng) {
+  if (target === "origin") {
+    originPoint = { name, lat, lng }; originInput.value = name;
+    if (originMarker) map.removeLayer(originMarker);
+    originMarker = L.marker([lat, lng], { icon: createPinIcon("#16a34a", "Origem") }).addTo(map);
+    activeInputTarget = "dest";
+  } else {
+    destPoint = { name, lat, lng }; destInput.value = name;
+    if (destMarker) map.removeLayer(destMarker);
+    destMarker = L.marker([lat, lng], { icon: createPinIcon("#111827", "Destino") }).addTo(map);
+  }
+  if (originPoint && destPoint) calculateRoute();
+  else map.setView([lat, lng], 15);
+}
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+async function calculateRoute() {
+  try {
+    const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${originPoint.lng},${originPoint.lat};${destPoint.lng},${destPoint.lat}?overview=full&geometries=geojson`);
+    const data = await res.json();
+    if (data.code === "Ok" && data.routes.length > 0) {
+      const r = data.routes[0];
+      const coords = r.geometry.coordinates.map(c => [c[1], c[0]]);
+      if (routeLine) map.removeLayer(routeLine);
+      routeLine = L.polyline(coords, { color: "#111827", weight: 5, opacity: 0.85 }).addTo(map);
+      map.fitBounds(routeLine.getBounds(), { padding: [45, 45] });
+      currentTrip = { km: r.distance / 1000, min: Math.max(1, Math.round(r.duration / 60)) };
+      updatePricesUI(); return;
+    }
+    throw new Error();
+  } catch {
+    const approxKm = Math.max(0.5, haversineKm(originPoint.lat, originPoint.lng, destPoint.lat, destPoint.lng) * 1.25);
+    const approxMin = Math.max(2, Math.round((approxKm / 35) * 60));
+    if (routeLine) map.removeLayer(routeLine);
+    routeLine = L.polyline([[originPoint.lat, originPoint.lng], [destPoint.lat, destPoint.lng]], { color: "#111827", weight: 4, dashArray: "8,8" }).addTo(map);
+    map.fitBounds(routeLine.getBounds(), { padding: [45, 45] });
+    currentTrip = { km: approxKm, min: approxMin };
+    updatePricesUI();
+  }
+}
+
+function calcFare(base, perKm, perMin, minFare, surgePct, km, min) {
+  return Math.round((Math.max(minFare, base + (km * perKm) + (min * perMin)) * (1 + surgePct / 100)) * 100) / 100;
+}
+
+function updatePricesUI() {
+  if (!currentTrip) return;
+  const { km, min } = currentTrip, surge = Number(config.surgePct) || 0;
+  currentTrip.carPrice = calcFare(Number(config.carBase), Number(config.carKm), Number(config.carMin), Number(config.carMinFare), surge, km, min);
+  currentTrip.motoPrice = calcFare(Number(config.motoBase), Number(config.motoKm), Number(config.motoMin), Number(config.motoMinFare), surge, km, min);
+
+  document.getElementById("distDisplay").textContent = `Distância: ${km.toFixed(1)} km`;
+  document.getElementById("timeDisplay").textContent = `Tempo: ~${min} min`;
+  const badge = document.getElementById("surgeBadge");
+  badge.style.display = surge > 0 ? "inline-block" : "none";
+  badge.textContent = `+${surge}% Dinâmica`;
+  document.getElementById("carPriceDisplay").textContent = formatBRL(currentTrip.carPrice);
+  document.getElementById("motoPriceDisplay").textContent = formatBRL(currentTrip.motoPrice);
+  document.getElementById("carRateHint").textContent = `Base ${formatBRL(config.carBase)} + ${formatBRL(config.carKm)}/km`;
+  document.getElementById("motoRateHint").textContent = `Base ${formatBRL(config.motoBase)} + ${formatBRL(config.motoKm)}/km`;
+  document.getElementById("rideOptions").style.display = "flex";
+}
+
+function selectVehicle(v) {
+  selectedVehicle = v;
+  document.getElementById("cardCar").classList.toggle("active", v === "car");
+  document.getElementById("cardMoto").classList.toggle("active", v === "moto");
+}
+
+async function requestRide() {
+  if (!originPoint || !destPoint || !currentTrip) return showToast("Defina origem e destino.");
+  const newRide = {
+    origin: originPoint, dest: destPoint,
+    km: Number(currentTrip.km.toFixed(1)), min: currentTrip.min,
+    vehicle: selectedVehicle,
+    price: selectedVehicle === "car" ? currentTrip.carPrice : currentTrip.motoPrice,
+    payment: document.getElementById("passengerPayment").value,
+    passengerName: document.getElementById("passengerName").value.trim() || "Passageiro",
+    passengerPhone: document.getElementById("passengerPhone").value.trim(),
+    note: document.getElementById("passengerNote").value.trim(),
+    status: "pending", driverId: null, driverName: null, driverCar: null, driverPlate: null,
+    createdAt: Date.now()
+  };
+
+  if (isFirebaseConfigured) {
+    const docRef = await db.collection("rides").add(newRide);
+    myRideId = docRef.id;
+  } else {
+    myRideId = "ride_" + Date.now();
+    ridesList.unshift({ id: myRideId, ...newRide });
+    localStorage.setItem(K_RIDES, JSON.stringify(ridesList));
+    broadcastDemo(); onRidesUpdated();
+  }
+  localStorage.setItem(K_MY_RIDE, myRideId);
+  showToast("Corrida enviada aos motoristas!");
+}
+
+function renderPassengerActiveRide() {
+  const reqBox = document.getElementById("passengerRequestBox"), activeBox = document.getElementById("activeRideCard");
+  const ride = ridesList.find((r) => r.id === myRideId);
+  if (!ride) { reqBox.style.display = "block"; activeBox.style.display = "none"; return; }
+
+  reqBox.style.display = "none"; activeBox.style.display = "block";
+  const labels = { pending: "Procurando motorista...", accepted: "Motorista a caminho!", in_progress: "Viagem em andamento", completed: "Corrida finalizada", cancelled: "Corrida cancelada" };
+  const badge = document.getElementById("activeRideBadge");
+  badge.className = `badge ${ride.status}`; badge.textContent = labels[ride.status] || ride.status;
+
+  document.getElementById("activeRideRoute").innerHTML = `📍 <strong>De:</strong> ${ride.origin.name}<br>🏁 <strong>Para:</strong> ${ride.dest.name}<br>💰 <strong>Valor:</strong> ${formatBRL(ride.price)} (${ride.km} km • ${ride.payment || "Pix"})`;
+  const info = document.getElementById("activeRideDriverInfo");
+  if (ride.driverName) info.innerHTML = `🚘 <strong>Motorista:</strong> ${ride.driverName}<br>🚙 <strong>Veículo:</strong> ${ride.driverCar || "-"} | <strong>Placa:</strong> ${ride.driverPlate || "-"}`;
+  else if (ride.status === "pending") info.innerHTML = `⏳ Aguardando motorista aceitar em Curvelo...`;
+  else info.innerHTML = `Corrida encerrada.`;
+
+  const pixBox = document.getElementById("activeRidePixBox");
+  if (ride.payment === "Pix" && config.pixKey && ride.status !== "cancelled") {
+    document.getElementById("pixKeyText").textContent = config.pixKey;
+    pixBox.style.display = "flex";
+  } else pixBox.style.display = "none";
+
+  const finished = ride.status === "completed" || ride.status === "cancelled";
+  document.getElementById("btnPassengerCancel").style.display = finished ? "none" : "flex";
+  document.getElementById("btnPassengerNew").style.display = finished ? "flex" : "none";
+}
+
+async function copyPixKey() { if (!config.pixKey) return; await copyText(config.pixKey); showToast("Chave Pix copiada!"); }
+async function cancelActiveRide() { if (!myRideId) return; await updateRideDoc(myRideId, { status: "cancelled" }); showToast("Corrida cancelada."); }
+
+function clearMyRide() {
+  myRideId = null; localStorage.removeItem(K_MY_RIDE);
+  originPoint = null; destPoint = null; currentTrip = null;
+  originInput.value = ""; destInput.value = "";
+  document.getElementById("rideOptions").style.display = "none";
+  clearMapGraphics(); map.setView(CURVELO_CENTER, 14); renderPassengerActiveRide();
+}
+
+function sendActiveRideToZap() {
+  const ride = ridesList.find((r) => r.id === myRideId); if (!ride) return;
+  const msg = [
+    `🚕 *PEDIDO ${(config.appName || "ZapLeva").toUpperCase()}*`,
+    `📍 *Origem:* ${ride.origin.name}`, `🏁 *Destino:* ${ride.dest.name}`,
+    `🛣️ ${ride.km} km | ${ride.vehicle === "car" ? "🚗 Carro" : "🏍️ Moto"}`,
+    `💰 *Valor:* ${formatBRL(ride.price)} (${ride.payment || "Pix"})`,
+    `👤 *Passageiro:* ${ride.passengerName}`, ride.note ? `📝 *Obs:* ${ride.note}` : "",
+    `🗺️ Embarque: https://maps.google.com/?q=${ride.origin.lat},${ride.origin.lng}`
+  ].filter(Boolean).join("\n");
+  const phone = (config.centralPhone || "").replace(/\D/g, "");
+  window.open(phone.length >= 10 ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+}
+
+function checkDriverPinLock() {
+  const req = (config.driverPin || "").trim();
+  const ok = !req || (localStorage.getItem(K_DRIVER_PIN_OK) || "") === req;
+  document.getElementById("driverPinBox").style.display = ok ? "none" : "block";
+  document.getElementById("driverMainBox").style.display = ok ? "block" : "none";
+}
+
+function unlockDriverPanel() {
+  const typed = document.getElementById("driverPinInput").value.trim(), req = (config.driverPin || "").trim();
+  if (typed === req) { localStorage.setItem(K_DRIVER_PIN_OK, req); document.getElementById("driverPinInput").value = ""; checkDriverPinLock(); showToast("Acesso liberado!"); }
+  else showToast("PIN incorreto.");
+}
+
+function loadDriverProfile() {
+  try { const s = localStorage.getItem(K_DRIVER); if (s) return JSON.parse(s); } catch {}
+  const p = { id: "drv_" + Math.random().toString(36).slice(2, 10), name: "", vehicle: "car", carModel: "", plate: "", online: false };
+  localStorage.setItem(K_DRIVER, JSON.stringify(p)); return p;
+}
+
+function loadDriverInputs() {
+  document.getElementById("driverName").value = driverProfile.name || "";
+  document.getElementById("driverVehicleType").value = driverProfile.vehicle || "car";
+  document.getElementById("driverCarModel").value = driverProfile.carModel || "";
+  document.getElementById("driverPlate").value = driverProfile.plate || "";
+  updateDriverOnlineUI();
+}
+
+function saveDriverProfile() {
+  driverProfile.name = document.getElementById("driverName").value.trim();
+  driverProfile.vehicle = document.getElementById("driverVehicleType").value;
+  driverProfile.carModel = document.getElementById("driverCarModel").value.trim();
+  driverProfile.plate = document.getElementById("driverPlate").value.trim().toUpperCase();
+  localStorage.setItem(K_DRIVER, JSON.stringify(driverProfile));
+}
+
+function toggleDriverOnline() {
+  saveDriverProfile();
+  if (!driverProfile.online && !driverProfile.name) return showToast("Preencha seu Nome primeiro!");
+  driverProfile.online = !driverProfile.online;
+  localStorage.setItem(K_DRIVER, JSON.stringify(driverProfile));
+  updateDriverOnlineUI(); renderDriverPanel();
+}
+
+function updateDriverOnlineUI() {
+  const btn = document.getElementById("driverOnlineBtn"), txt = document.getElementById("driverStatusText");
+  if (driverProfile.online) { btn.className = "toggle-btn on"; btn.textContent = "ONLINE"; txt.textContent = "Recebendo chamados em Curvelo e região"; }
+  else { btn.className = "toggle-btn off"; btn.textContent = "OFFLINE"; txt.textContent = "Você está offline"; }
+}
+
+function checkNewRideAlert() {
+  const cur = ridesList.filter((r) => r.status === "pending");
+  let hasNew = false; cur.forEach((r) => { if (!lastKnownPendingIds.has(r.id)) hasNew = true; });
+  lastKnownPendingIds = new Set(cur.map((r) => r.id));
+  const req = (config.driverPin || "").trim(), unlocked = !req || localStorage.getItem(K_DRIVER_PIN_OK) === req;
+  if (hasNew && driverProfile.online && unlocked) { playBeep(); showToast("🔔 Nova corrida disponível!"); }
+}
+
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)(), osc = ctx.createOscillator(), g = ctx.createGain();
+    osc.type = "sine"; osc.frequency.setValueAtTime(880, ctx.currentTime); g.gain.setValueAtTime(0.15, ctx.currentTime);
+    osc.connect(g); g.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 0.25);
+  } catch {}
+}
+
+function renderDriverPanel() {
+  const myActive = ridesList.find((r) => r.driverId === driverProfile.id && (r.status === "accepted" || r.status === "in_progress"));
+  const activeCard = document.getElementById("driverActiveCard");
+  if (myActive) {
+    activeCard.style.display = "block";
+    const badge = document.getElementById("driverActiveBadge");
+    badge.className = `badge ${myActive.status}`; badge.textContent = myActive.status === "accepted" ? "Indo buscar" : "Em viagem";
+    document.getElementById("driverActiveDetails").innerHTML = `👤 <strong>Passageiro:</strong> ${myActive.passengerName}<br>📍 <strong>Origem:</strong> ${myActive.origin.name}<br>🏁 <strong>Destino:</strong> ${myActive.dest.name}<br>💰 <strong>Valor:</strong> ${formatBRL(myActive.price)} (${myActive.km} km • ${myActive.payment || "Pix"})${myActive.note ? `<br>📝 <strong>Obs:</strong> ${myActive.note}` : ""}`;
+    document.getElementById("btnDriverZapPassenger").style.display = (myActive.passengerPhone || "").replace(/\D/g, "").length >= 8 ? "flex" : "none";
+    document.getElementById("btnStartTrip").style.display = myActive.status === "accepted" ? "flex" : "none";
+    document.getElementById("btnFinishTrip").style.display = myActive.status === "in_progress" ? "flex" : "none";
+  } else activeCard.style.display = "none";
+
+  const listEl = document.getElementById("driverPendingList");
+  if (!driverProfile.online) { listEl.innerHTML = `<div class="card" style="text-align:center;color:var(--muted);">Fique <strong>ONLINE</strong> acima para receber corridas.</div>`; return; }
+  const pending = ridesList.filter((r) => r.status === "pending");
+  if (pending.length === 0) { listEl.innerHTML = `<div class="card" style="text-align:center;color:var(--muted);">Nenhuma corrida pendente...</div>`; return; }
+
+  listEl.innerHTML = pending.map((r) => `
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <strong>${r.vehicle === "car" ? "🚗 Carro" : "🏍️ Moto"} • ${formatBRL(r.price)} (${r.payment || "Pix"})</strong>
+        <span class="badge pending">${r.km} km</span>
+      </div>
+      <div style="font-size:13px; color:var(--muted); margin-bottom:10px; line-height:1.45;">
+        📍 <strong>De:</strong> ${r.origin.name}<br>🏁 <strong>Para:</strong> ${r.dest.name}<br>👤 <strong>Cliente:</strong> ${r.passengerName} ${r.note ? `• Obs: ${r.note}` : ""}
+      </div>
+      <button class="btn green sm" onclick="acceptRide('${r.id}')">✅ Aceitar Corrida</button>
+    </div>
+  `).join("");
+}
+
+function contactPassengerZap() {
+  const myActive = ridesList.find((r) => r.driverId === driverProfile.id && (r.status === "accepted" || r.status === "in_progress"));
+  if (!myActive || !myActive.passengerPhone) return;
+  let num = myActive.passengerPhone.replace(/\D/g, ""); if (num.length <= 11) num = "55" + num;
+  window.open(`https://wa.me/${num}?text=${encodeURIComponent(`Olá ${myActive.passengerName}! Sou ${driverProfile.name}, seu motorista do ZapLeva (${driverProfile.carModel} - ${driverProfile.plate}).`)}`, "_blank");
+}
+
+async function acceptRide(rideId) {
+  saveDriverProfile();
+  if (!driverProfile.name) return showToast("Informe seu nome primeiro.");
+  await updateRideDoc(rideId, { status: "accepted", driverId: driverProfile.id, driverName: driverProfile.name, driverCar: driverProfile.carModel || "-", driverPlate: driverProfile.plate || "-" });
+  showToast("Corrida aceita!");
+}
+
+async function driverUpdateStatus(newStatus) {
+  const myActive = ridesList.find((r) => r.driverId === driverProfile.id && (r.status === "accepted" || r.status === "in_progress"));
+  if (!myActive) return;
+  await updateRideDoc(myActive.id, { status: newStatus });
+  showToast(newStatus === "completed" ? "Corrida finalizada!" : "Viagem iniciada!");
+}
+
+function openDriverMaps(which) {
+  const myActive = ridesList.find((r) => r.driverId === driverProfile.id && (r.status === "accepted" || r.status === "in_progress"));
+  if (!myActive) return;
+  const pt = which === "origin" ? myActive.origin : myActive.dest;
+  w
